@@ -3,6 +3,7 @@ package net.easecation.playeractionrecorder;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 import net.easecation.playeractionrecorder.easechat.EaseChatHandler;
 import net.easecation.playeractionrecorder.provider.C3p0ConnectionPool;
+import net.easecation.playeractionrecorder.provider.MySQLDataProvider;
 
 import java.io.*;
 import java.net.URI;
@@ -24,6 +25,7 @@ public class PlayerActionRecorder {
     public static void main(String[] args) {
         logger.info("Starting player action recorder...");
 
+        ComboPooledDataSource cpds = null;
         URI easechat = null;
         try {
             Properties props = new Properties();
@@ -47,7 +49,7 @@ public class PlayerActionRecorder {
             props.load(in);
             in.close();
 
-            ComboPooledDataSource cpds = new ComboPooledDataSource();
+            cpds = new ComboPooledDataSource();
             cpds.setDriverClass(props.getProperty("driverClass"));
             cpds.setJdbcUrl(props.getProperty("jdbcUrl"));
             cpds.setUser(props.getProperty("user"));
@@ -56,7 +58,6 @@ public class PlayerActionRecorder {
             cpds.setMaxIdleTime(Integer.parseInt(props.getProperty("maxIdleTime")));
             cpds.setMaxPoolSize(Integer.parseInt(props.getProperty("maxPoolSize")));
             cpds.setMinPoolSize(Integer.parseInt(props.getProperty("minPoolSize")));
-            C3p0ConnectionPool.loadConfig(cpds);
 
             easechat = new URI(props.getProperty("easechat"));
         } catch (Exception e) {
@@ -66,8 +67,7 @@ public class PlayerActionRecorder {
         }
 
         try {
-            Connection connection = C3p0ConnectionPool.getInstance().getConnection();
-            connection.close();
+            MySQLDataProvider.load(cpds);
             logger.finest("Database connect successful!");
         } catch (Exception e) {
             logger.warning("Failed to connect to server.");

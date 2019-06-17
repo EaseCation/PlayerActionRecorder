@@ -1,11 +1,17 @@
 package net.easecation.playeractionrecorder.easechat;
 
+import com.mchange.v2.c3p0.ComboPooledDataSource;
 import net.easecation.easechat.api.Logger;
 import net.easecation.easechat.api.message.AutoSubChannelMessage;
 import net.easecation.easechat.network.EaseChatClient;
 import net.easecation.playeractionrecorder.PlayerActionRecorder;
+import net.easecation.playeractionrecorder.action.ActionDataEntry;
+import net.easecation.playeractionrecorder.provider.C3p0ConnectionPool;
+import net.easecation.playeractionrecorder.provider.MySQLDataProvider;
+import net.easecation.playeractionrecorder.provider.ProviderException;
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -22,6 +28,8 @@ public class EaseChatHandler {
         return instance;
     }
 
+    private int insertIn5Seconds = 0;
+
     public static void init(URI uri, String clientName) {
         instance = new EaseChatHandler();
         instance.uri = uri;
@@ -30,9 +38,9 @@ public class EaseChatHandler {
             instance.connect(uri, clientName);
             instance.registerChannel("recorder");
         } catch (Exception e) {
-            PlayerActionRecorder.getLogger().warning("[EaseChat] 连接服务端 " + uri.toString() + " 时失败！");
+            PlayerActionRecorder.getLogger().warning("[EaseChat] Failed to connect " + uri.toString());
             e.printStackTrace();
-            PlayerActionRecorder.getLogger().warning("[EaseChat] 5秒后将重试！");
+            PlayerActionRecorder.getLogger().warning("[EaseChat] Try again in 5 seconds");
             instance.nextAllowReconnect = System.currentTimeMillis() + 5000;
         }
         Timer timer = new Timer();
@@ -41,7 +49,7 @@ public class EaseChatHandler {
             public void run() {
                 instance.onUpdate();
             }
-        }, 5000);
+        }, 0, 5000);
     }
 
     public void shutdown() {
@@ -49,19 +57,30 @@ public class EaseChatHandler {
     }
 
     public void onUpdate() {
+        if (insertIn5Seconds > 0) {
+            try {
+                ComboPooledDataSource ds = C3p0ConnectionPool.getInstance().getDs();
+                PlayerActionRecorder.getLogger().info("Insert " + insertIn5Seconds + " records in five seconds!\n **** database connection data: current=" + ds.getNumConnections()
+                        + " busy=" + ds.getNumBusyConnections()
+                        + " idle=" + ds.getNumIdleConnections());
+            } catch (SQLException e) {
+                //ignore
+            }
+            insertIn5Seconds = 0;
+        }
         if (this.client == null || !this.client.isActive()) {
             if (System.currentTimeMillis() < this.nextAllowReconnect) return;
             this.nextAllowReconnect = Long.MAX_VALUE;
-            PlayerActionRecorder.getLogger().warning("[EaseChat] 发现已断开与 " + uri.toString() + " 的连接！正在重新连接~");
+            PlayerActionRecorder.getLogger().warning("[EaseChat] Connection of " + uri.toString() + " disconnected! Reconnecting~");
 
             try {
                 connect(uri, clientName);
-                client.getLogger().info("正在重新订阅频道...");
+                client.getLogger().info("Reregister channels...");
                 registerChannel("recorder");
             } catch (Exception e) {
-                PlayerActionRecorder.getLogger().warning("[EaseChat] 重新连接服务端 " + uri.toString() + " 时失败！");
+                PlayerActionRecorder.getLogger().warning("[EaseChat] Failed to connect " + uri.toString());
                 e.printStackTrace();
-                PlayerActionRecorder.getLogger().warning("[EaseChat] 5秒后将重试！");
+                PlayerActionRecorder.getLogger().warning("[EaseChat] Try again in 5 seconds");
                 client.shutdown();
                 nextAllowReconnect = System.currentTimeMillis() + 5000;
             }
@@ -116,8 +135,17 @@ public class EaseChatHandler {
         client.getLogger().info("EaseChat server connected!" + uri);
     }
 
-    private void handle(String data) {
-
+    private void handle(String raw) {
+        ActionDataEntry data = ActionDataEntry.decode(raw);
+        if (data != null) {
+            try {
+                PlayerActionRecorder.getLogger().fine(data.toString());
+                MySQLDataProvider.getInstance().pushRecord(data);
+                insertIn5Seconds++;
+            } catch (ProviderException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void registerChannel(String channel) {
@@ -127,7 +155,7 @@ public class EaseChatHandler {
         }
         client.getSender().sendAsyncChannelMessage(new AutoSubChannelMessage(channel), f -> {
             if (f.isSuccess()) {
-                client.getLogger().info("已注册频道 " + channel);
+                client.getLogger().info("Channel " + channel + " registered!");
             }
         });
     }
