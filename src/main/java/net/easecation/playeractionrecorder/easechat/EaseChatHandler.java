@@ -12,8 +12,10 @@ import net.easecation.playeractionrecorder.provider.ProviderException;
 
 import java.net.URI;
 import java.sql.SQLException;
+import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class EaseChatHandler {
 
@@ -135,17 +137,37 @@ public class EaseChatHandler {
         client.getLogger().info("EaseChat server connected!" + uri);
     }
 
+    Queue<ActionDataEntry> queue = new LinkedBlockingQueue<>();
+    long lastUpdate = 0;
+
     private void handle(String raw) {
         ActionDataEntry data = ActionDataEntry.decode(raw);
         if (data != null) {
+            PlayerActionRecorder.getLogger().fine(data.toString());
+            offerQueue(data);
+            //MySQLDataProvider.getInstance().pushRecord(data);
+        }
+    }
+
+    private void offerQueue(ActionDataEntry data) {
+        queue.offer(data);
+        if (queue.size() >= 100 || System.currentTimeMillis() > lastUpdate + 500) {
             try {
-                PlayerActionRecorder.getLogger().fine(data.toString());
-                MySQLDataProvider.getInstance().pushRecord(data);
-                insertIn5Seconds++;
+                this.pushQueue();
             } catch (ProviderException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    private void pushQueue() throws ProviderException {
+        if (queue.isEmpty()) return;
+        ActionDataEntry[] push = queue.toArray(new ActionDataEntry[0]);
+        queue.clear();
+        PlayerActionRecorder.getLogger().warning("正在上传 " + push.length + " 条数据...");
+        MySQLDataProvider.getInstance().pushRecords(push);
+        insertIn5Seconds+= push.length;
+        lastUpdate = System.currentTimeMillis();
     }
 
     public void registerChannel(String channel) {

@@ -8,17 +8,16 @@ public class ActionDataEntry {
 
     private long logtime;
     private String username;
-    private ActionCategory category;
-    private ActionEvent event;
+    private int category;
+    private int event;
     private String metadata;
     private String rawdata;
 
-    public ActionDataEntry(long logtime, String username, ActionEvent event, String metadata, String rawdata) {
+    public ActionDataEntry(long logtime, String username, int category, int event, String metadata, String rawdata) {
         Objects.requireNonNull(username);
-        Objects.requireNonNull(event);
         this.logtime = logtime;
         this.username = username;
-        this.category = event.getCategory();
+        this.category = category;
         this.event = event;
         this.metadata = metadata;
         this.rawdata = rawdata;
@@ -32,11 +31,11 @@ public class ActionDataEntry {
         return username;
     }
 
-    public ActionCategory getCategory() {
+    public int getCategory() {
         return category;
     }
 
-    public ActionEvent getEvent() {
+    public int getEvent() {
         return event;
     }
 
@@ -49,18 +48,19 @@ public class ActionDataEntry {
     }
 
     public String encode() {
-        //boybook;GAMING_LOBBY_JOIN;timestamp;metadata;rawdata
-        return String.join(SPLIT_CHAR, username, event.name(), String.valueOf(logtime), metadata, rawdata);
+        //boybook;1;1;timestamp;metadata;rawdata
+        return String.join(SPLIT_CHAR, username, String.valueOf(category), String.valueOf(event), String.valueOf(logtime), metadata, rawdata);
     }
 
     public static ActionDataEntry decode(String raw) {
         //boybook;GAMING_LOBBY_JOIN;timestamp;metadata;rawdata
         String[] data = raw.split(ActionDataEntry.SPLIT_CHAR, 5);
-        if (data.length == 5) {
+        if (data.length == 6) {
             try {
-                ActionEvent action = ActionEvent.valueOf(data[1]);
-                long timestamp = Long.parseLong(data[2]);
-                return new ActionDataEntry(timestamp, data[0], action, data[3], data[4]);
+                int category = Integer.parseInt(data[1]);
+                int event = Integer.parseInt(data[2]);
+                long timestamp = Long.parseLong(data[3]);
+                return new ActionDataEntry(timestamp, data[0], category, event, data[4], data[5]);
             } catch (Exception e) {
                 e.printStackTrace();
             }

@@ -28,6 +28,31 @@ public class MySQLDataProvider {
         return C3p0ConnectionPool.getInstance().getConnection();
     }
 
+    public void pushRecords(ActionDataEntry[] records) throws ProviderException {
+        try {
+            Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO recorder.records (logtime, username, category, event, metadata, rawdata) VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            for (ActionDataEntry record : records) {
+                statement.setTimestamp(1, new Timestamp(record.getLogtime()));
+                statement.setString(2, record.getUsername());
+                statement.setInt(3, record.getCategory());
+                statement.setInt(4, record.getEvent());
+                statement.setString(5, record.getMetadata());
+                statement.setString(6, record.getRawdata());
+                statement.addBatch();
+            }
+
+            statement.executeBatch();
+
+            statement.close();
+            connection.close();
+        } catch (Exception e){
+            throw new ProviderException("Exception caught when pushRecords:", e);
+        }
+    }
+
     public void pushRecord(ActionDataEntry record) throws ProviderException {
         try {
             Connection connection = getConnection();
@@ -36,8 +61,8 @@ public class MySQLDataProvider {
             );
             statement.setTimestamp(1, new Timestamp(record.getLogtime()));
             statement.setString(2, record.getUsername());
-            statement.setString(3, record.getCategory().name());
-            statement.setString(4, record.getEvent().name());
+            statement.setInt(3, record.getCategory());
+            statement.setInt(4, record.getEvent());
             statement.setString(5, record.getMetadata());
             statement.setString(6, record.getRawdata());
 
