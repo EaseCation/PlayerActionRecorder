@@ -23,7 +23,7 @@ public class ActionDataEntry {
         this.rawdata = rawdata;
     }
 
-    public long getLogtime() {
+    public long getLogTime() {
         return logtime;
     }
 
@@ -40,11 +40,11 @@ public class ActionDataEntry {
     }
 
     public String getMetadata() {
-        return metadata;
+        return (metadata == null || metadata.equals("null")) ? null : metadata;
     }
 
-    public String getRawdata() {
-        return rawdata;
+    public String getRawData() {
+        return (rawdata == null || rawdata.equals("null")) ? null : rawdata;
     }
 
     public String encode() {
@@ -54,7 +54,7 @@ public class ActionDataEntry {
 
     public static ActionDataEntry decode(String raw) {
         //boybook;GAMING_LOBBY_JOIN;timestamp;metadata;rawdata
-        String[] data = raw.split(ActionDataEntry.SPLIT_CHAR, 5);
+        String[] data = raw.split(ActionDataEntry.SPLIT_CHAR, 6);
         if (data.length == 6) {
             try {
                 int category = Integer.parseInt(data[1]);

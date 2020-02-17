@@ -35,12 +35,12 @@ public class MySQLDataProvider {
                     "INSERT INTO recorder.records (logtime, username, category, event, metadata, rawdata) VALUES (?, ?, ?, ?, ?, ?)"
             );
             for (ActionDataEntry record : records) {
-                statement.setTimestamp(1, new Timestamp(record.getLogtime()));
+                statement.setTimestamp(1, new Timestamp(record.getLogTime()));
                 statement.setString(2, record.getUsername());
                 statement.setInt(3, record.getCategory());
                 statement.setInt(4, record.getEvent());
                 statement.setString(5, record.getMetadata());
-                statement.setString(6, record.getRawdata());
+                statement.setString(6, record.getRawData());
                 statement.addBatch();
             }
 
@@ -59,12 +59,12 @@ public class MySQLDataProvider {
             PreparedStatement statement = connection.prepareStatement(
                     "INSERT INTO recorder.records (logtime, username, category, event, metadata, rawdata) VALUES (?, ?, ?, ?, ?, ?)"
             );
-            statement.setTimestamp(1, new Timestamp(record.getLogtime()));
+            statement.setTimestamp(1, new Timestamp(record.getLogTime()));
             statement.setString(2, record.getUsername());
             statement.setInt(3, record.getCategory());
             statement.setInt(4, record.getEvent());
             statement.setString(5, record.getMetadata());
-            statement.setString(6, record.getRawdata());
+            statement.setString(6, record.getRawData());
 
             statement.execute();
 
