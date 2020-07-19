@@ -6,6 +6,9 @@ import net.easecation.playeractionrecorder.action.ActionDataEntry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 
 public class MySQLDataProvider {
 
@@ -28,6 +31,8 @@ public class MySQLDataProvider {
         return C3p0ConnectionPool.getInstance().getConnection();
     }
 
+    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     public void pushRecords(ActionDataEntry[] records) throws ProviderException {
         try {
             Connection connection = getConnection();
@@ -35,7 +40,8 @@ public class MySQLDataProvider {
                     "INSERT INTO recorder.records (logtime, username, category, event, metadata, rawdata) VALUES (?, ?, ?, ?, ?, ?)"
             );
             for (ActionDataEntry record : records) {
-                statement.setTimestamp(1, new Timestamp(record.getLogTime()));
+                String time = Instant.ofEpochMilli(record.getLogTime()).atOffset(ZoneOffset.ofHours(8)).format(dtf);
+                statement.setString(1, time);
                 statement.setString(2, record.getUsername());
                 statement.setInt(3, record.getCategory());
                 statement.setInt(4, record.getEvent());
