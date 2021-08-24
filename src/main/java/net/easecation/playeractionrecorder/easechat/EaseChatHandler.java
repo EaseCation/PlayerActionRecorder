@@ -5,7 +5,9 @@ import net.easecation.easechat.api.Logger;
 import net.easecation.easechat.api.message.AutoSubChannelMessage;
 import net.easecation.easechat.network.EaseChatClient;
 import net.easecation.playeractionrecorder.PlayerActionRecorder;
-import net.easecation.playeractionrecorder.action.ActionDataEntry;
+import net.easecation.playeractionrecorder.TextFormat;
+import net.easecation.playeractionrecorder.data.ActionDataEntry;
+import net.easecation.playeractionrecorder.data.ChatLogEntry;
 import net.easecation.playeractionrecorder.provider.C3p0ConnectionPool;
 import net.easecation.playeractionrecorder.provider.MySQLDataProvider;
 import net.easecation.playeractionrecorder.provider.ProviderException;
@@ -16,6 +18,8 @@ import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class EaseChatHandler {
 
@@ -38,7 +42,7 @@ public class EaseChatHandler {
         instance.clientName = clientName;
         try {
             instance.connect(uri, clientName);
-            instance.registerChannel("recorder");
+            instance.registerChannels();
         } catch (Exception e) {
             PlayerActionRecorder.getLogger().warning("[EaseChat] Failed to connect " + uri.toString());
             e.printStackTrace();
@@ -56,6 +60,30 @@ public class EaseChatHandler {
 
     public void shutdown() {
         if (this.client != null) this.client.shutdown();
+    }
+
+    public void registerChannel(String channel) {
+        if (client == null || client.getSender() == null) {
+            new EaseChatSentFailedException("Not connected").printStackTrace();
+            return;
+        }
+        client.getSender().sendAsyncChannelMessage(new AutoSubChannelMessage(channel), f -> {
+            if (f.isSuccess()) {
+                client.getLogger().info("Channel " + channel + " registered!");
+            }
+        });
+    }
+
+    private void registerChannels() {
+        registerChannel("recorder");
+        registerChannel("buglet");
+        registerChannel("helper");
+        registerChannel("stage-chat");
+        registerChannel("lobby/main");
+        registerChannel("lobby/mw");
+        registerChannel("lobby/cw");
+        registerChannel("lobby/parkour");
+        registerChannel("lobby/pit");
     }
 
     public void onUpdate() {
@@ -78,7 +106,7 @@ public class EaseChatHandler {
             try {
                 connect(uri, clientName);
                 client.getLogger().info("Reregister channels...");
-                registerChannel("recorder");
+                registerChannels();
             } catch (Exception e) {
                 PlayerActionRecorder.getLogger().warning("[EaseChat] Failed to connect " + uri.toString());
                 e.printStackTrace();
@@ -94,8 +122,25 @@ public class EaseChatHandler {
         client = new EaseChatClient(
                 clientName, uri,
                 recv -> {
-                    if (recv.getChannelName().equals("recorder")) {
-                        handle(recv.getText());
+                    try {
+                        if (recv.getChannelName().equals("recorder")) {
+                            handleRecorder(recv.getText());
+                        } else if (recv.getChannelName().equals("buglet")) {
+                            handleBuglet(recv.getText());
+                        } else if (recv.getChannelName().equals("helper")) {
+                            handleHelper(recv.getText());
+                        } else if (recv.getChannelName().startsWith("lobby/")) {
+                            String[] lobbyTypeData = recv.getChannelName().split("/", 2);
+                            if (lobbyTypeData.length >= 2) {
+                                String lobbyType = lobbyTypeData[1];
+                                this.handleLobbyMessage(lobbyType, recv.getText());
+                            }
+                        } else if (recv.getChannelName().equals("stage-chat")) {
+                            handleStageMessage(recv.getText());
+                        }
+                    } catch (Exception e) {
+                        client.getLogger().error(e.getMessage());
+                        e.printStackTrace();
                     }
                 }
         );
@@ -137,49 +182,123 @@ public class EaseChatHandler {
         client.getLogger().info("EaseChat server connected!" + uri);
     }
 
-    Queue<ActionDataEntry> queue = new LinkedBlockingQueue<>();
-    long lastUpdate = 0;
+    Queue<ActionDataEntry> queueAction = new LinkedBlockingQueue<>();
+    long lastUpdateAction = 0;
 
-    private void handle(String raw) {
+    Queue<ChatLogEntry> queueChatLog = new LinkedBlockingQueue<>();
+    long lastUpdateChatLog = 0;
+
+    private void handleRecorder(String raw) {
         ActionDataEntry data = ActionDataEntry.decode(raw);
         if (data != null) {
             PlayerActionRecorder.getLogger().fine(data.toString());
-            offerQueue(data);
+            offerQueueAction(data);
             //MySQLDataProvider.getInstance().pushRecord(data);
         }
     }
 
-    private void offerQueue(ActionDataEntry data) {
-        queue.offer(data);
-        if (queue.size() >= 100 || System.currentTimeMillis() > lastUpdate + 500) {
+    private void handleBuglet(String msg) {
+        String[] data = msg.split("!\\$\\$!", 3);
+        if (data.length >= 3) {
+            String nick = data[0];
+            String name = data[1];
+            String message = data[2];
+            PlayerActionRecorder.getLogger().warning("[BUGLET] " + name + " => " + message);
+            //玩家名<大厅名 #id>
+            Pattern r = Pattern.compile("(.*)<(.*) #(.*)>");
+            Matcher m = r.matcher(TextFormat.clean(name));
+            if (m.find()) {
+                PlayerActionRecorder.getLogger().warning("[BUGLET Match] " + m.group(1) + " " + m.group(2) + " " + m.group(3));
+                this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.BUGLET, m.group(2), Integer.parseInt(m.group(3)), nick, m.group(1), TextFormat.clean(message)));
+            }
+        }
+    }
+
+    private void handleLobbyMessage(String lobbyType, String msg) {
+        String[] sp = msg.split("!\\$\\$!");
+        if (sp.length >= 6) {
+            String lobbyIdentifier = sp[0];
+            int id = Integer.parseInt(sp[1]);
+            String nickName = sp[2];
+            String showedName = sp[3];
+            String aliasName = sp[4];
+            String message = sp[5];
+            PlayerActionRecorder.getLogger().warning("[LOBBY] " + lobbyType + "," + lobbyIdentifier + "," + id + "," + showedName + "," + aliasName + " => " + message);
+            this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.LOBBY, lobbyType, id, nickName, aliasName, TextFormat.clean(message)));
+        }
+    }
+
+    private void handleHelper(String msg) {
+        String[] data = msg.split("!\\$\\$!", 3);
+        if (data.length >= 3) {
+            String nick = data[0];
+            String name = data[1];
+            String message = data[2];
+            if (!name.equals("WAntiCheatPro#作弊检测系统")) {
+                PlayerActionRecorder.getLogger().warning("[HELPER] " + name + " => " + message);
+                this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.HELPER, "", 0, nick, name, TextFormat.clean(message)));
+            }
+        }
+    }
+
+    private void handleStageMessage(String msg) {
+        String[] data = msg.split("!\\$\\$!", 8);
+        if (data.length >= 8) {
+            String stageType = data[0];
+            int stageRuntimeId = Integer.parseInt(data[1]);
+            int stageDBId = Integer.parseInt(data[2]);
+            String playerNick = data[3];
+            String playerDisplayName = data[4];
+            String playerAliasName = data[5];
+            String playerTeam = data[6];
+            String message = data[7];
+            PlayerActionRecorder.getLogger().warning("[STAGE] [" + stageType + "-" + stageRuntimeId + "]" + playerAliasName + " => " + message);
+            this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.STAGE, stageType, stageRuntimeId, playerNick, playerAliasName, TextFormat.clean(message)));
+        }
+    }
+
+    //======================================
+
+    private void offerQueueAction(ActionDataEntry data) {
+        queueAction.offer(data);
+        if (queueAction.size() >= 100 || System.currentTimeMillis() > lastUpdateAction + 500) {
             try {
-                this.pushQueue();
+                this.pushQueueAction();
             } catch (ProviderException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void pushQueue() throws ProviderException {
-        if (queue.isEmpty()) return;
-        ActionDataEntry[] push = queue.toArray(new ActionDataEntry[0]);
-        queue.clear();
-        PlayerActionRecorder.getLogger().warning("正在上传 " + push.length + " 条数据...");
+    private void pushQueueAction() throws ProviderException {
+        if (queueAction.isEmpty()) return;
+        ActionDataEntry[] push = queueAction.toArray(new ActionDataEntry[0]);
+        queueAction.clear();
+        PlayerActionRecorder.getLogger().warning("[RecordAction] 正在上传 " + push.length + " 条数据...");
         MySQLDataProvider.getInstance().pushRecords(push);
-        insertIn5Seconds+= push.length;
-        lastUpdate = System.currentTimeMillis();
+        insertIn5Seconds += push.length;
+        lastUpdateAction = System.currentTimeMillis();
     }
 
-    public void registerChannel(String channel) {
-        if (client == null || client.getSender() == null) {
-            new EaseChatSentFailedException("Not connected").printStackTrace();
-            return;
-        }
-        client.getSender().sendAsyncChannelMessage(new AutoSubChannelMessage(channel), f -> {
-            if (f.isSuccess()) {
-                client.getLogger().info("Channel " + channel + " registered!");
+    private void offerQueueChatLog(ChatLogEntry data) {
+        queueChatLog.offer(data);
+        if (queueChatLog.size() >= 100 || System.currentTimeMillis() > lastUpdateChatLog + 500) {
+            try {
+                this.pushQueueChatLog();
+            } catch (ProviderException e) {
+                e.printStackTrace();
             }
-        });
+        }
+    }
+
+    private void pushQueueChatLog() throws ProviderException {
+        if (queueChatLog.isEmpty()) return;
+        ChatLogEntry[] push = queueChatLog.toArray(new ChatLogEntry[0]);
+        queueChatLog.clear();
+        PlayerActionRecorder.getLogger().warning("[ChatLog] 正在上传 " + push.length + " 条数据...");
+        MySQLDataProvider.getInstance().pushChatLog(push);
+        insertIn5Seconds += push.length;
+        lastUpdateChatLog = System.currentTimeMillis();
     }
 
 }

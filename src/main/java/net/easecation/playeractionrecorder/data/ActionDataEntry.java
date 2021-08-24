@@ -1,4 +1,4 @@
-package net.easecation.playeractionrecorder.action;
+package net.easecation.playeractionrecorder.data;
 
 import java.util.Objects;
 

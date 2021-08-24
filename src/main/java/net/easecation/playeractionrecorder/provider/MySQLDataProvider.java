@@ -1,7 +1,8 @@
 package net.easecation.playeractionrecorder.provider;
 
 import com.mchange.v2.c3p0.ComboPooledDataSource;
-import net.easecation.playeractionrecorder.action.ActionDataEntry;
+import net.easecation.playeractionrecorder.data.ActionDataEntry;
+import net.easecation.playeractionrecorder.data.ChatLogEntry;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -56,6 +57,31 @@ public class MySQLDataProvider {
             connection.close();
         } catch (Exception e){
             throw new ProviderException("Exception caught when pushRecords:", e);
+        }
+    }
+
+    public void pushChatLog(ChatLogEntry[] records) throws ProviderException {
+        try {
+            Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO recorder.logChat (type, posType, posId, sourceNick, sourceName, message) VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            for (ChatLogEntry record : records) {
+                statement.setString(1, record.getType().name());
+                statement.setString(2, record.getPosType());
+                statement.setInt(3, record.getPosId());
+                statement.setString(4, record.getSourceNick());
+                statement.setString(5, record.getSourceName());
+                statement.setString(6, record.getMessage());
+                statement.addBatch();
+            }
+
+            statement.executeBatch();
+
+            statement.close();
+            connection.close();
+        } catch (Exception e){
+            throw new ProviderException("Exception caught when pushChatLog:", e);
         }
     }
 
