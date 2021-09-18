@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.chars.Char2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectRBTreeMap;
 
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -111,6 +112,8 @@ public enum TextFormat {
     public static final char ESCAPE = '\u00A7';
 
     private static final Pattern CLEAN_PATTERN = Pattern.compile("(?i)" + ESCAPE + "[0-9A-GK-OR]");
+    private static final Pattern CLEAN_EMOJI_PATTERN = Pattern.compile("[\ud83c\udc00-\ud83c\udfff]|[\u2600-\u27ff]",
+            Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
     private final static Int2ObjectMap<TextFormat> BY_ID = new Int2ObjectRBTreeMap<>();
     private final static Char2ObjectMap<TextFormat> BY_CHAR = new Char2ObjectOpenHashMap<>();
 
@@ -178,12 +181,22 @@ public enum TextFormat {
             return null;
         }
 
-        String result = CLEAN_PATTERN.matcher(cleanIcon(input, recursive)).replaceAll("");
+        String result = CLEAN_PATTERN.matcher(cleanIcon(filterEmoji(input), recursive)).replaceAll("");
 
         if (recursive && CLEAN_PATTERN.matcher(result).find()) {
             return clean(result, true);
         }
         return result;
+    }
+
+    public static String filterEmoji(String input) {
+        Matcher emojiMatcher = CLEAN_EMOJI_PATTERN.matcher(input);
+        if (emojiMatcher.find()) {
+            //将所获取的表情转换为*
+            return emojiMatcher.replaceAll("*");
+        } else {
+            return input;
+        }
     }
 
     /**
