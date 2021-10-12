@@ -261,13 +261,6 @@ public class EaseChatHandler {
 
     private void offerQueueAction(ActionDataEntry data) {
         queueAction.offer(data);
-        if (queueAction.size() >= 100 || System.currentTimeMillis() > lastUpdateAction + 500) {
-            try {
-                this.pushQueueAction();
-            } catch (ProviderException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     private void pushQueueAction() throws ProviderException {
@@ -280,25 +273,36 @@ public class EaseChatHandler {
         lastUpdateAction = System.currentTimeMillis();
     }
 
-    private void offerQueueChatLog(ChatLogEntry data) {
-        queueChatLog.offer(data);
-        if (queueChatLog.size() >= 100 || System.currentTimeMillis() > lastUpdateChatLog + 500) {
+    public void tryPushQueueAction() {
+        if (queueAction.size() >= 100 || System.currentTimeMillis() > lastUpdateAction + 500) {
             try {
-                this.pushQueueChatLog();
+                this.pushQueueAction();
             } catch (ProviderException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void pushQueueChatLog() throws ProviderException {
+    private void offerQueueChatLog(ChatLogEntry data) {
+        queueChatLog.offer(data);
+    }
+
+    private void pushQueueChatLog() {
         if (queueChatLog.isEmpty()) return;
         ChatLogEntry[] push = queueChatLog.toArray(new ChatLogEntry[0]);
         queueChatLog.clear();
         PlayerActionRecorder.getLogger().warning("[ChatLog] 正在上传 " + push.length + " 条数据...");
-        MySQLDataProvider.getInstance().pushChatLog(push);
+        try {
+            MySQLDataProvider.getInstance().pushChatLog(push);
+        } catch (ProviderException ignore) {}
         insertIn5Seconds += push.length;
         lastUpdateChatLog = System.currentTimeMillis();
+    }
+
+    public void tryPushQueueChatLog() {
+        if (queueChatLog.size() >= 100 || System.currentTimeMillis() > lastUpdateChatLog + 500) {
+            this.pushQueueChatLog();
+        }
     }
 
 }

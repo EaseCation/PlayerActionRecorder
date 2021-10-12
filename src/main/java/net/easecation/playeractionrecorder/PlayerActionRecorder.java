@@ -10,6 +10,7 @@ import java.net.URI;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 public class PlayerActionRecorder {
@@ -17,10 +18,11 @@ public class PlayerActionRecorder {
     private static Logger logger = Logger.getLogger(PlayerActionRecorder.class.getName());
     public final static String PATH = System.getProperty("user.dir") + "/";
 
+    public static PlayerActionRecorder INSTANCE;
+
     public static Logger getLogger() {
         return logger;
     }
-
 
     public static void main(String[] args) {
         logger.info("Starting player action recorder...");
@@ -93,10 +95,52 @@ public class PlayerActionRecorder {
                 getLogger().info("Closing easechat...");
                 EaseChatHandler.getInstance().shutdown();
                 getLogger().info("EaseChat closed!");
+
+                INSTANCE.isRunning.set(false);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }));
+
+        INSTANCE = new PlayerActionRecorder();
+    }
+
+    // ====================================================================
+
+
+    public PlayerActionRecorder() {
+        this.tickProcessor();
+    }
+
+    private long nextTick;
+    private AtomicBoolean isRunning = new AtomicBoolean(true);
+
+    public void tickProcessor() {
+        this.nextTick = System.currentTimeMillis();
+        try {
+            while (this.isRunning.get()) {
+                try {
+                    this.tick();
+                } catch (RuntimeException e) {
+                    getLogger().warning("tickProcessor ROOT RuntimeException");
+                    e.printStackTrace();
+                } finally {
+                    long next = this.nextTick;
+                    long current = System.currentTimeMillis();
+                    if (next - 0.1 > current) {
+                        Thread.sleep(next - current - 1, 900000);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            getLogger().warning("Exception happened while ticking server");
+            e.printStackTrace();
+        }
+    }
+
+    public void tick() {
+        EaseChatHandler.getInstance().tryPushQueueAction();
+        EaseChatHandler.getInstance().tryPushQueueChatLog();
     }
 
 }
