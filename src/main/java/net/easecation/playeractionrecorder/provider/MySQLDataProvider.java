@@ -6,10 +6,12 @@ import net.easecation.playeractionrecorder.data.ChatLogEntry;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 public class MySQLDataProvider {
 
@@ -35,9 +37,11 @@ public class MySQLDataProvider {
     DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public void pushRecords(ActionDataEntry[] records) throws ProviderException {
+        Connection connection = null;
+        PreparedStatement statement = null;
         try {
-            Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(
+            connection = getConnection();
+            statement = connection.prepareStatement(
                     "INSERT INTO recorder.records (logtime, username, category, event, metadata, rawdata) VALUES (?, ?, ?, ?, ?, ?)"
             );
             for (ActionDataEntry record : records) {
@@ -52,18 +56,32 @@ public class MySQLDataProvider {
             }
 
             statement.executeBatch();
-
-            statement.close();
-            connection.close();
         } catch (Exception e){
             throw new ProviderException("Exception caught when pushRecords:", e);
+        } finally {
+            Optional.ofNullable(statement).ifPresent(s -> {
+                try {
+                    s.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
+            Optional.ofNullable(connection).ifPresent(c -> {
+                try {
+                    c.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 
     public void pushChatLog(ChatLogEntry[] records) throws ProviderException {
+        Connection connection = null;
+        PreparedStatement statement = null;
         try {
-            Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(
+            connection = getConnection();
+            statement = connection.prepareStatement(
                     "INSERT INTO recorder.logChat (type, posType, posId, sourceNick, sourceName, message) VALUES (?, ?, ?, ?, ?, ?)"
             );
             for (ChatLogEntry record : records) {
@@ -77,18 +95,32 @@ public class MySQLDataProvider {
             }
 
             statement.executeBatch();
-
-            statement.close();
-            connection.close();
         } catch (Exception e){
             throw new ProviderException("Exception caught when pushChatLog:", e);
+        } finally {
+            Optional.ofNullable(statement).ifPresent(s -> {
+                try {
+                    s.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
+            Optional.ofNullable(connection).ifPresent(c -> {
+                try {
+                    c.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 
     public void pushRecord(ActionDataEntry record) throws ProviderException {
+        Connection connection = null;
+        PreparedStatement statement = null;
         try {
-            Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(
+            connection = getConnection();
+            statement = connection.prepareStatement(
                     "INSERT INTO recorder.records (logtime, username, category, event, metadata, rawdata) VALUES (?, ?, ?, ?, ?, ?)"
             );
             statement.setTimestamp(1, new Timestamp(record.getLogTime()));
@@ -99,11 +131,23 @@ public class MySQLDataProvider {
             statement.setString(6, record.getRawData());
 
             statement.execute();
-
-            statement.close();
-            connection.close();
         } catch (Exception e){
             throw new ProviderException("Exception caught when pushRecord:", e);
+        } finally {
+            Optional.ofNullable(statement).ifPresent(s -> {
+                try {
+                    s.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
+            Optional.ofNullable(connection).ifPresent(c -> {
+                try {
+                    c.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 
