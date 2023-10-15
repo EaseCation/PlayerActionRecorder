@@ -84,6 +84,8 @@ public class EaseChatHandler {
         registerChannel("lobby/cw");
         registerChannel("lobby/parkour");
         registerChannel("lobby/pit");
+        registerChannel("lobby/bedwars");
+        registerChannel("lobby/sw");
     }
 
     public void onUpdate() {
