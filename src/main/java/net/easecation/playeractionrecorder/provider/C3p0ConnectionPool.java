@@ -7,7 +7,7 @@ import java.sql.SQLException;
 
 public class C3p0ConnectionPool {
 
-    private ComboPooledDataSource ds;
+    private final ComboPooledDataSource ds;
 
     private static C3p0ConnectionPool pool;
 

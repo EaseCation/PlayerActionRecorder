@@ -6,12 +6,12 @@ public class ActionDataEntry {
 
     public static final String SPLIT_CHAR = String.valueOf(new char[]{(char)185, (char)215});
 
-    private long logtime;
-    private String username;
-    private int category;
-    private int event;
-    private String metadata;
-    private String rawdata;
+    private final long logtime;
+    private final String username;
+    private final int category;
+    private final int event;
+    private final String metadata;
+    private final String rawdata;
 
     public ActionDataEntry(long logtime, String username, int category, int event, String metadata, String rawdata) {
         Objects.requireNonNull(username);

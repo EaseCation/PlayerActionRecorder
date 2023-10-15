@@ -7,15 +7,13 @@ import net.easecation.playeractionrecorder.provider.MySQLDataProvider;
 
 import java.io.*;
 import java.net.URI;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 public class PlayerActionRecorder {
 
-    private static Logger logger = Logger.getLogger(PlayerActionRecorder.class.getName());
+    private static final Logger logger = Logger.getLogger(PlayerActionRecorder.class.getName());
     public final static String PATH = System.getProperty("user.dir") + "/";
 
     public static PlayerActionRecorder INSTANCE;
@@ -113,7 +111,7 @@ public class PlayerActionRecorder {
     }
 
     private long nextTick;
-    private AtomicBoolean isRunning = new AtomicBoolean(true);
+    private final AtomicBoolean isRunning = new AtomicBoolean(true);
 
     public void tickProcessor() {
         this.nextTick = System.currentTimeMillis();
