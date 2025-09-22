@@ -3,7 +3,7 @@ package net.easecation.playeractionrecorder.data;
 public class ChatLogEntry {
 
     public enum Type {
-        LOBBY, STAGE, BUGLET, HELPER
+        LOBBY, STAGE, BUGLET, HELPER, FRIEND_CHAT, GUILD_CHAT, PARTY_CHAT
     }
 
     private final Type type;

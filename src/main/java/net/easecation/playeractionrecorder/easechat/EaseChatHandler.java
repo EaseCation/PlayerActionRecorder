@@ -86,6 +86,13 @@ public class EaseChatHandler {
         registerChannel("lobby/pit");
         registerChannel("lobby/bedwars");
         registerChannel("lobby/sw");
+        registerChannel("lobby/rl");
+        registerChannel("lobby/pit-pc");
+        registerChannel("lobby/pit-hack");
+        registerChannel("lobby/training");
+        registerChannel("friend");
+        registerChannel("guild");
+        registerChannel("party");
     }
 
     public void onUpdate() {
@@ -139,6 +146,12 @@ public class EaseChatHandler {
                             }
                         } else if (recv.getChannelName().equals("stage-chat")) {
                             handleStageMessage(recv.getText());
+                        } else if (recv.getChannelName().equals("friend")) {
+                            handleFriendMessage(recv.getText());
+                        } else if (recv.getChannelName().equals("guild")) {
+                            handleGuildMessage(recv.getText());
+                        } else if (recv.getChannelName().equals("party")) {
+                            handlePartyMessage(recv.getText());
                         }
                     } catch (Exception e) {
                         client.getLogger().error(e.getMessage());
@@ -304,6 +317,65 @@ public class EaseChatHandler {
     public void tryPushQueueChatLog() {
         if (queueChatLog.size() >= 100 || System.currentTimeMillis() > lastUpdateChatLog + 500) {
             this.pushQueueChatLog();
+        }
+    }
+
+    private void handleFriendMessage(String msg) {
+        String[] data = msg.split("!\\$\\$!", 2);
+        if (data.length >= 2 && data[0].equals("CHAT")) {
+            String[] chatData = data[1].split("@%#");
+            if (chatData.length >= 4) {
+                String friendNick = chatData[0];
+                String senderNick = chatData[1];
+                String senderAliasName = chatData[2];
+                String message = chatData[3];
+                PlayerActionRecorder.getLogger().warning("[FRIEND_CHAT] " + senderAliasName + " -> " + friendNick + " => " + message);
+                this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.FRIEND_CHAT, "", 0, senderNick, senderAliasName, TextFormat.clean(message)));
+            }
+        }
+    }
+
+    private void handleGuildMessage(String msg) {
+        String[] data = msg.split("!\\$\\$!", 2);
+        if (data.length >= 2 && data[0].equals("CHAT")) {
+            String[] chatData = data[1].split("@%#");
+            if (chatData.length >= 4) {
+                String guildIdStr = chatData[0];
+                String senderNick = chatData[1];
+                String senderAliasName = chatData[2];
+                String message = chatData[3];
+                try {
+                    int guildId = Integer.parseInt(guildIdStr);
+                    PlayerActionRecorder.getLogger().warning("[GUILD_CHAT] [Guild-" + guildId + "] " + senderAliasName + " => " + message);
+                    this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.GUILD_CHAT, "guild", guildId, senderNick, senderAliasName, TextFormat.clean(message)));
+                } catch (NumberFormatException e) {
+                    PlayerActionRecorder.getLogger().warning("[GUILD_CHAT] Invalid guild ID: " + guildIdStr);
+                }
+            }
+        }
+    }
+
+    private void handlePartyMessage(String msg) {
+        String[] data = msg.split("!\\$\\$!", 3);
+        if (data.length >= 3) {
+            try {
+                int partyId = Integer.parseInt(data[0]);
+                String messageType = data[1];
+                // 目前只处理聊天消息，如果有的话
+                if (messageType.equals("CHAT")) {
+                    String[] chatData = data[2].split("@%#");
+                    if (chatData.length >= 3) {
+                        String senderNick = chatData[0];
+                        String senderAliasName = chatData[1];
+                        String message = chatData[2];
+                        PlayerActionRecorder.getLogger().warning("[PARTY_CHAT] [Party-" + partyId + "] " + senderAliasName + " => " + message);
+                        this.offerQueueChatLog(new ChatLogEntry(ChatLogEntry.Type.PARTY_CHAT, "party", partyId, senderNick, senderAliasName, TextFormat.clean(message)));
+                    }
+                }
+                // 其他消息类型如RECONNECT、DISCONNECT等不记录为聊天日志
+            } catch (NumberFormatException e) {
+                PlayerActionRecorder.getLogger().warning("[PARTY] Invalid party ID in message: " + msg);
+            }
         }
     }
 
